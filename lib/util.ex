@@ -3,4 +3,8 @@
 defmodule Util do
   def inspect(%{debug_level: 0}, _msg), do: nil
   def inspect(%{debug_level: 1}, msg),  do: IO.puts "#{inspect(self())} -- #{inspect(msg)}"
+  def thread_preempt(leader, pn) do
+    send leader, { :preempted, pn }
+    exit(0)
+  end
 end

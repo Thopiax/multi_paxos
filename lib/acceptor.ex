@@ -3,21 +3,21 @@
 defmodule Acceptor do
   def start(config), do: next(-1, MapSet.new(), config)
 
-  def next(ballot_num, accepted, config) do
+  def next(pn, accepted, config) do
     receive do
-      { :p1a, leader, bn } ->
-        Util.inspect(config, "Received [p1a] from #{leader} with ballot_number #{bn}")
-        new_ballot_num = max(ballot_num, bn)
-        send leader, { :p1b, self(), new_ballot_num, accepted }
+      { :p1a, leader, r_pn } ->
+        Util.inspect(config, "Received [p1a] from #{inspect(leader)} with ballot_number #{r_pn}")
+        new_pn = max(pn, r_pn)
+        send leader, { :p1b, self(), new_pn, accepted }
 
-        next(new_ballot_num, accepted, config)
-      { :p2a, leader, msg = { bn, _sn, _c }} ->
-        Util.inspect(config, "Received [p2a] from #{leader} with ballot_number #{bn}")
+        next(new_pn, accepted, config)
+      { :p2a, leader, msg = { r_pn, _sn, _c }} ->
+        Util.inspect(config, "Received [p2a] from #{inspect(leader)} with ballot_number #{r_pn}")
 
-        if bn == ballot_num, do: MapSet.put(accepted, msg)
+        if pn == r_pn, do: MapSet.put(accepted, msg)
 
-        send leader, { :p2b, self(), ballot_num }
-        next(ballot_num, accepted, config)
+        send leader, { :p2b, self(), pn }
+        next(pn, accepted, config)
     end
   end
 end
