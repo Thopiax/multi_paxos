@@ -7,7 +7,7 @@ defmodule Acceptor do
     receive do
       { :p1a, leader, r_pn } ->
         Util.inspect(config, "Received [p1a] from #{inspect(leader)} with ballot_number #{r_pn}")
-        new_pn = max(pn, r_pn)
+        new_pn = Util.max(pn, r_pn)
         send leader, { :p1b, self(), new_pn, accepted }
 
         next(new_pn, accepted, config)
