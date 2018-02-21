@@ -41,14 +41,15 @@ defmodule Leader do
 
       { :preempted, pn = {r, _l} } ->
         # Util.inspect(config, "PREEMPTED: PN = #{inspect(pn)}, NEW_PN = #{inspect {r + 1, self()}}")
-        # i.e. data > state.pn
-        if Util.max(pn, state.pn) == pn do
+        if Util.greater?(pn, state.pn) do
           state
           |> Map.put(:active, false)
           |> Map.put(:pn, {r + 1, self()})
           |> spawn_scout(config)
-          |> next(config, proposals)
+        else
+          state
         end
+        |> next(config, proposals)
     end
   end
 

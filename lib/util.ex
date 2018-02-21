@@ -9,18 +9,25 @@ defmodule Util do
     exit(0)
   end
 
-  def max(a, nil), do: a
-  def max(nil, b), do: b
-  def max(a = {x1, y1}, b = {x2, y2}) do
+  def max(a, b) do
+    if greater?(a, b), do: a, else: b
+  end
+
+  def greater?(_a, nil), do: true
+  def greater?(nil, _b), do: false
+  def greater?({x1, y1}, {x2, y2}) do
     cond do
-      x1 < x2    -> b
-      x2 > x1    -> a
-      :otherwise -> if y1 > y2, do: a, else: b
+      x1 < x2    -> false
+      x2 > x1    -> true
+      :otherwise -> if y1 > y2, do: true, else: false
     end
   end
 
   def fetch_tuple(set, key) do
-    Map.new(set)[key]
+    case Map.new(set)[key] do
+      nil -> nil
+      val -> {key, val}
+    end
   end
 
   def key_in_set?(set, key) do

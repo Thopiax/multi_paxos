@@ -1,6 +1,6 @@
 defmodule Replica do
 
-  @window 10
+  @window 5
 
   def start(config, database, monitor) do
     receive do
@@ -20,6 +20,7 @@ defmodule Replica do
     receive do
       { :client_request, cmd } ->
         new_reqs = MapSet.put(requests, cmd)
+        send state.monitor, { :client_request, config.server_num }
 
         propose(state, config, new_reqs, proposals, decisions)
       { :decision, sn, cmd } ->
@@ -32,30 +33,51 @@ defmodule Replica do
     end
   end
 
-  defp handle_decision(state = %{slot_out: slot_out}, config, requests, proposals, decisions) do
-    case Util.fetch_tuple(decisions, slot_out) do
-      {_s, c1} ->
-        {new_props, new_reqs} =
-          case Util.fetch_tuple(proposals, slot_out) do
-            {_s, c2} ->
-              props = MapSet.delete(proposals, {slot_out, c2})
-              reqs  = (if c1 != c2, do: MapSet.put(requests, c2), else: requests)
-
-              {props, reqs}
-            nil ->
-              {proposals, requests}
-          end
-
-        state
-        |> perform(config, c1, decisions)
-        |> handle_decision(config, new_reqs, new_props, decisions)
-
-      nil ->
-        state
-    end
+  defp perform_decision(state, config, c, requests, proposals, decisions) do
+    state
+    |> perform(config, c, decisions)
+    |> handle_decision(config, requests, proposals, decisions)
   end
 
-  defp propose(state = %{slot_in: slot_in, slot_out: slot_out},
+  defp handle_decision(state = %{slot_out: slot_out}, config, requests, proposals, decisions) do
+    with true     <- Util.key_in_set?(decisions, slot_out),
+         {_s, c1} <- Util.fetch_tuple(decisions, slot_out),
+         {_s, c2} <- Util.fetch_tuple(proposals, slot_out)
+    do
+      props = MapSet.delete(proposals, {slot_out, c2})
+      reqs  = (if c1 != c2, do: MapSet.put(requests, c2), else: requests)
+
+      perform_decision(state, config, c1, reqs, props, decisions)
+    else
+      nil ->
+        # i.e. there is no c2 in proposals
+        {_s, c} = Util.fetch_tuple(decisions, slot_out)
+        perform_decision(state, config, c, requests, proposals, decisions)
+      false ->
+        # i.e. no slot_out decision in decisions
+        state
+    end
+    # case Util.fetch_tuple(decisions, slot_out) do
+    #   {_s, c1} ->
+    #     {new_props, new_reqs} =
+    #       case Util.fetch_tuple(proposals, slot_out) do
+    #         {_s, c2} ->
+    #           props = MapSet.delete(proposals, {slot_out, c2})
+    #           reqs  = (if c1 != c2, do: MapSet.put(requests, c2), else: requests)
+    #           {props, reqs}
+    #         nil ->
+    #           {proposals, requests}
+    #       end
+    #
+    #     state
+    #     |> perform(config, c1, decisions)
+    #     |> handle_decision(config, new_reqs, new_props, decisions)
+    #
+    #   nil -> state
+    # end
+  end
+
+  def propose(state = %{slot_in: slot_in, slot_out: slot_out},
                config,
                requests,
                proposals,
@@ -79,15 +101,15 @@ defmodule Replica do
       |> propose(config, new_reqs, new_props, decisions)
     end
   end
-  defp propose(state, config, requests, proposals, decisions) do
+  def propose(state, config, requests, proposals, decisions) do
     next(state, config, requests, proposals, decisions)
   end
 
-  defp perform(state, _config, cmd = { cl, cid, op }, decisions) do
+  def perform(state, _config, cmd = { cl, cid, op }, decisions) do
     # check if there aren't any elements in decisions with the same command and a lower slot_out
     unless Enum.any?(decisions, fn ({s, c}) -> (s < state.slot_out and c == cmd) end) do
       send state.database, { :execute, op }
-      send cl, { :response, cid, nil}
+      send cl,             { :reply, cid, nil}
     end
     state
     |> Map.put(:slot_out, state.slot_out + 1)
