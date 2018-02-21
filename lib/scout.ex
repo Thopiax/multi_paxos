@@ -17,7 +17,7 @@ defmodule Scout do
   def next(state, config, waitfor, pvalues) do
     receive do
       { :p1b, ac, pn, vals } ->
-        # Util.inspect(config, "Received [p1b] from A#{inspect(ac)} with PN #{inspect(pn)} and val #{inspect(vals)}")
+        # Util.inspect(config, "Received [p1b] from STATE_PN = #{inspect state.pn} with PN #{inspect(pn)}")
         if pn == state.pn do
           # Update sets
           new_pvalues = MapSet.union(pvalues, vals)

@@ -18,8 +18,8 @@ defmodule Util do
   def greater?({x1, y1}, {x2, y2}) do
     cond do
       x1 < x2    -> false
-      x2 > x1    -> true
-      :otherwise -> if y1 > y2, do: true, else: false
+      x1 > x2    -> true
+      :otherwise -> (if y1 > y2, do: true, else: false)
     end
   end
 

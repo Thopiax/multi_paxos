@@ -1,19 +1,17 @@
 # Rafael Toletti Ballestiero (rb2215) and Norbert Podsadowski (np1815)
 
 defmodule Leader do
-  def start(config) do
+  def start(config, monitor) do
     receive do
       { :bind, acceptors, replicas } ->
-        pn = {0, self()}
-
-        spawn Scout, :start, [config, self(), acceptors, pn]
-
         %{
+          monitor: monitor,
           acceptors: acceptors,
           replicas: replicas,
           active: false,
-          pn: pn
+          pn: {0, self()}
         }
+        |> spawn_scout(config)
         |> next(config, MapSet.new())
     end
   end
@@ -26,11 +24,13 @@ defmodule Leader do
           if state.active do
             spawn_commander(state, config, state.pn, sn, c)
           end
+          proposals = MapSet.put(proposals, {sn, c})
         end
-        next(state, config, MapSet.put(proposals, {sn, c}))
+
+        next(state, config, proposals)
 
       { :adopted, pn, pvals } ->
-        Util.inspect(config, "ADOPTED: proposal for pn = #{inspect(pn)} and pvals = #{inspect(pvals)}")
+        # Util.inspect(config, "ADOPTED: proposal for pn = #{inspect(pn)} and pvals = #{inspect(pvals)}")
         new_proposals = update_sets(proposals, pmax(pvals))
 
         Enum.each(new_proposals, fn ({sn, c}) -> spawn_commander(state, config, pn, sn, c) end)
@@ -40,8 +40,11 @@ defmodule Leader do
         |> next(config, new_proposals)
 
       { :preempted, pn = {r, _l} } ->
-        # Util.inspect(config, "PREEMPTED: PN = #{inspect(pn)}, NEW_PN = #{inspect {r + 1, self()}}")
+        Util.inspect(config, "PREEMPTED: PN = #{inspect(pn)}, NEW_PN = #{inspect {r + 1, self()}} and #{Util.greater?(pn, state.pn)}")
         if Util.greater?(pn, state.pn) do
+          # Help with Liveliness
+          Process.sleep(Enum.random(1..40))
+
           state
           |> Map.put(:active, false)
           |> Map.put(:pn, {r + 1, self()})
@@ -55,13 +58,15 @@ defmodule Leader do
 
   # Spawns a Scout and returns the given state
   defp spawn_scout(state, config) do
-    # Util.inspect(config, "SPAWN: SCOUT with PN=#{inspect state.pn})")
+    send state.monitor, { :spawn_count, :scout }
+    # Util.inspect(config, "SPAWN: SCOUT with PN=#{inspect state.pn}")
     spawn Scout, :start, [config, self(), state.acceptors, state.pn]
 
     state
   end
 
   defp spawn_commander(state, config, pn, sn, c) do
+    send state.monitor, { :spawn_count, :commander }
     # Util.inspect(config, "SPAWN: COMMANDER with PN=#{inspect state.pn}, SN=#{sn} and C=#{inspect c}")
     spawn Commander, :start, [config, self(), state.acceptors, state.replicas, {pn, sn, c}]
 

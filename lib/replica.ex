@@ -1,6 +1,7 @@
-defmodule Replica do
+# Rafael Toletti Ballestiero (rb2215) and Norbert Podsadowski (np1815)
 
-  @window 5
+defmodule Replica do
+  @window 10000
 
   def start(config, database, monitor) do
     receive do
@@ -24,7 +25,7 @@ defmodule Replica do
 
         propose(state, config, new_reqs, proposals, decisions)
       { :decision, sn, cmd } ->
-        Util.inspect(config, "DECISION: SN=#{sn} with CMD=#{inspect(cmd)}")
+        # Util.inspect(config, "DECISION: SN=#{sn} with CMD=#{inspect(cmd)}")
         new_decs = MapSet.put(decisions, {sn, cmd})
 
         state
@@ -57,24 +58,6 @@ defmodule Replica do
         # i.e. no slot_out decision in decisions
         state
     end
-    # case Util.fetch_tuple(decisions, slot_out) do
-    #   {_s, c1} ->
-    #     {new_props, new_reqs} =
-    #       case Util.fetch_tuple(proposals, slot_out) do
-    #         {_s, c2} ->
-    #           props = MapSet.delete(proposals, {slot_out, c2})
-    #           reqs  = (if c1 != c2, do: MapSet.put(requests, c2), else: requests)
-    #           {props, reqs}
-    #         nil ->
-    #           {proposals, requests}
-    #       end
-    #
-    #     state
-    #     |> perform(config, c1, decisions)
-    #     |> handle_decision(config, new_reqs, new_props, decisions)
-    #
-    #   nil -> state
-    # end
   end
 
   def propose(state = %{slot_in: slot_in, slot_out: slot_out},
